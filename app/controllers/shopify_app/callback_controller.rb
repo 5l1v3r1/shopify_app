@@ -24,6 +24,28 @@ module ShopifyApp
       end
     end
 
+    def jwt_callback
+      unless auth_hash
+        head(:unauthorized)
+        return
+      end
+
+      unless jwt_shopify_domain == shop_name && jwt_shopify_user_id == associated_user_id
+        head(:unauthorized)
+        return
+      end
+
+      session_store = ShopifyAPI::Session.new(
+        domain: shop_name,
+        token: token,
+        api_version: ShopifyApp.configuration.api_version
+      )
+
+      ShopifyApp::SessionRepository.store_user_session(session_store, associated_user)
+
+      head(:ok)
+    end
+
     private
 
     def login_shop
@@ -42,7 +64,11 @@ module ShopifyApp
     def associated_user
       return unless auth_hash['extra'].present?
 
-      auth_hash['extra']['associated_user']
+      auth_hash['extra']['associated_user'].with_indifferent_access
+    end
+
+    def associated_user_id
+      associated_user && associated_user[:id]
     end
 
     def token
